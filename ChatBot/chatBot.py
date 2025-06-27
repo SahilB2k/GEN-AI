@@ -1,17 +1,43 @@
-from langchain_huggingface import ChatHuggingFace,HuggingFacePipeline
+from transformers import pipeline
+from langchain_huggingface import ChatHuggingFace, HuggingFacePipeline
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+import streamlit as st
+from dotenv import load_dotenv
+import os
 
-llm=HuggingFacePipeline(
-    model_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    task="text-generation",
-    pipeline_kwargs=dict(
-        temperature=1.5,
-        max_new_tokens=150
-    )
+load_dotenv()
 
-        
+# Fix: Create the Hugging Face pipeline first
+pipe = pipeline(
+    "text-generation",
+    model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    temperature=0.8,
+    max_new_tokens=150
 )
 
-model=ChatHuggingFace(llm=llm)
+# Then pass it to LangChain 
+llm = HuggingFacePipeline(pipeline=pipe,)
+model = ChatHuggingFace(llm=llm)
 
-while True:
-    user_input=input()
+# Environment variables
+os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+
+# Prompt template
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant. Please provide a helpful response to the user's queries."),
+    ("user", "Question: {question}")
+])
+
+output_parser = StrOutputParser()
+chain = prompt | model | output_parser
+
+# Streamlit
+st.title("Langchain Demo")
+input_text = st.text_input("Enter the topic here")
+
+if input_text:
+    with st.spinner("Generating response..."):
+        result = chain.invoke({"question": input_text})
+        st.write(result)
